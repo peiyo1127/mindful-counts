@@ -1,0 +1,84 @@
+      if(target)Object.assign(target,data,{source:target.source||data.source,updatedAt:now});
+    }else{
+      scriptures.unshift({id:crypto.randomUUID(),...data,createdAt:now});
+    }
+    persist(); toast('已儲存'); go('library');
+  }
+  $('#saveScripture').onclick=()=>{
+    const title=$('#editTitle').value.trim(),content=$('#editContent').value.trim(),dedication=$('#editDedication').value.trim();
+    if(!title)return toast('請輸入經文名稱');
+    const data={title,content,dedication,source:importedSource||($('#sourceChip').style.display!=='none'?$('#sourceChip').textContent.replace(/^來源：/,''):'')};
+    if(!editingId){
+      const same=scriptures.find(x=>normTitle(x.title)===normTitle(title));
+      if(same){
+        return openSheet({
+          title:`已經有「${title}」`,
+          note:'避免不小心重複匯入，你可以更新原本那一份，或刻意保留兩份。',
+          actions:[
+            {label:'更新原有經文',run:()=>writeScripture(data,{overwriteId:same.id})},
+            {label:'保留兩份',run:()=>writeScripture(data)}
+          ]
+        });
+      }
+    }
+    writeScripture(data);
+  };
+
+  function confirmDeleteScripture(id,after){
+    const s=scriptures.find(x=>x.id===id); if(!s)return;
+    const linked=sessions.filter(x=>x.scriptureId===id).length;
+    openSheet({
+      title:`刪除「${s.title}」？`,
+      note:linked?`這部經文有 ${linked} 筆歷史念誦紀錄。你可以保留紀錄，或一起刪除。`:'這部經文目前沒有歷史念誦紀錄。',
+      actions:[
+        {label:'只刪除經文，保留歷史紀錄',kind:'danger',run:()=>deleteScripture(id,false,after)},
+        ...(linked?[{label:'經文與歷史紀錄一起刪除',kind:'danger',run:()=>deleteScripture(id,true,after)}]:[])
+      ]
+    });
+  }
+  function deleteScripture(id,withSessions=false,after){
+    scriptures=scriptures.filter(x=>x.id!==id);
+    if(withSessions)sessions=sessions.filter(x=>x.scriptureId!==id);
+    persist(); renderLibrary(); renderRecords(); renderStats(); toast('已刪除'); after?.();
+  }
+  $('#deleteScripture').onclick=()=>editingId&&confirmDeleteScripture(editingId,()=>go('library'));
+
+  function renderLibrary(){
+    const el=$('#libraryList');
+    if(!scriptures.length){el.innerHTML='<div class="empty">還沒有經文。<br>可以從搜尋匯入，或手動新增。</div>';return;}
+    el.innerHTML=scriptures.map(s=>{
+      const total=sessions.filter(x=>x.scriptureId===s.id).reduce((a,b)=>a+(Number(b.count)||0),0);
+      return `<div class="library-item"><button class="library-open" data-start-id="${s.id}"><span><span class="name">${esc(s.title)}</span><span class="meta">累積 ${total.toLocaleString()} 次${s.source?` · ${esc(s.source)}`:''}</span></span><span class="arrow">›</span></button><button class="item-menu" data-manage-id="${s.id}" aria-label="管理 ${attr(s.title)}">···</button></div>`;
+    }).join('');
+    el.querySelectorAll('[data-start-id]').forEach(b=>b.onclick=()=>startSession(b.dataset.startId));
+    el.querySelectorAll('[data-manage-id]').forEach(b=>b.onclick=e=>{e.stopPropagation();openScriptureActions(b.dataset.manageId)});
+  }
+  function openScriptureActions(id){
+    const s=scriptures.find(x=>x.id===id);if(!s)return;
+    openSheet({title:s.title,note:'選擇要對這部經文做什麼。',actions:[
+      {label:'開始念誦',run:()=>startSession(id)},
+      {label:'編輯經文／回向文',run:()=>openEditor(id)},
+      {label:'刪除經文',kind:'danger',run:()=>confirmDeleteScripture(id)}
+    ]});
+  }
+  $('#startFromHome').onclick=()=>{
+    if(!scriptures.length){toast('先匯入或新增一部經文');go('search');}
+    else if(scriptures.length===1)startSession(scriptures[0].id);
+    else go('library');
+  };
+
+  let searchTimer=null;
+  $('#searchInput').addEventListener('input',()=>{clearTimeout(searchTimer);searchTimer=setTimeout(()=>searchScriptures($('#searchInput').value.trim()),420)});
+  $('#clearSearch').onclick=()=>{$('#searchInput').value='';$('#searchResults').innerHTML='';$('#searchStatus').textContent='搜尋結果可先預覽全文，再決定要匯入哪個版本。'};
+
+  async function searchScriptures(q){
+    if(!q){$('#searchResults').innerHTML='';$('#searchStatus').textContent='搜尋結果可先預覽全文，再決定要匯入哪個版本。';return;}
+    $('#searchStatus').innerHTML='<span class="loading"></span>正在搜尋維基文庫…';
+    $('#searchResults').innerHTML='';
+    try{
+      const url=`https://zh.wikisource.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(q)}&srlimit=12&utf8=1&format=json&origin=*`;
+      const r=await fetch(url); if(!r.ok)throw 0;
+      const j=await r.json();
+      const results=(j.query?.search||[]).filter(x=>!/:/.test(x.title)||/經|咒|品|佛|般若|陀羅尼|心/.test(x.title)).slice(0,10);
+      $('#searchStatus').textContent=results.length?`找到 ${results.length} 個結果。點選「預覽」先看全文，再決定是否匯入。`:'沒有找到結果，可改用手動新增。';
+      $('#searchResults').innerHTML=results.map((x,i)=>`<div class="result"><div><div class="result-title">${esc(x.title)}</div><div class="result-meta">維基文庫 · 搜尋結果 ${i+1}</div></div><button class="import-btn preview-btn" data-title="${attr(x.title)}">預覽</button></div>`).join('');
