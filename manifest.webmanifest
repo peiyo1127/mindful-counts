@@ -1,11 +1,14 @@
 {
+  "id":"/",
   "name":"mindful counts",
   "short_name":"counts",
-  "start_url":"./index.html",
+  "start_url":"/",
+  "scope":"/",
   "display":"standalone",
   "background_color":"#F7F4EC",
   "theme_color":"#F7F4EC",
   "icons":[
-    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+    {"src":"icon.svg","sizes":"192x192","type":"image/svg+xml","purpose":"any maskable"},
+    {"src":"icon.svg","sizes":"512x512","type":"image/svg+xml","purpose":"any maskable"}
   ]
 }
