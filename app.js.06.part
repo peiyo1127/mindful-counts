@@ -1,0 +1,29 @@
+    const w=statsWindow(statRange),filtered=sessionsInWindow(w.start,w.end);
+    const activeDays=new Set(filtered.map(x=>dayKey(x.startedAt))).size;
+    const total=filtered.reduce((a,b)=>a+(Number(b.count)||0),0);
+    $('#statDays').textContent=activeDays.toLocaleString();
+    $('#statTotal').textContent=total.toLocaleString();
+    $('#statsPeriod').textContent=w.label;
+    $('#statListPeriod').textContent=statRange==='week'?'最近 7 天':statRange==='month'?'本月':'今年';
+    $$('.stats-tab').forEach(btn=>{const on=btn.dataset.range===statRange;btn.classList.toggle('active',on);btn.setAttribute('aria-selected',on?'true':'false')});
+    const points=w.buckets.map(b=>{const n=sessionsInWindow(b.start,b.end).reduce((a,x)=>a+(Number(x.count)||0),0);return {...b,n}});
+    const mx=Math.max(1,...points.map(x=>x.n));
+    const chart=$('#bars');
+    chart.innerHTML=`<div class="chart-tip" id="chartTip"></div>`+points.map((x,i)=>{
+      const h=x.n===0?2:Math.max(8,Math.round(118*x.n/mx));
+      return `<div class="barwrap"><button class="barbtn" data-i="${i}" aria-label="${attr(x.tip)} ${x.n.toLocaleString()} 次"><div class="bar" style="height:${h}px;opacity:${x.n===0?.18:1}"></div><span>${esc(x.label)}</span></button></div>`;
+    }).join('');
+    const tip=$('#chartTip');
+    chart.querySelectorAll('.barbtn').forEach(btn=>btn.onclick=()=>{
+      const x=points[Number(btn.dataset.i)];chart.querySelectorAll('.barbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+      tip.textContent=`${x.tip} · ${x.n.toLocaleString()} 次`;tip.classList.add('show');clearTimeout(renderStats._tipTimer);renderStats._tipTimer=setTimeout(()=>tip.classList.remove('show'),2600);
+    });
+    const by={};filtered.forEach(x=>by[x.scriptureId]=(by[x.scriptureId]||0)+(Number(x.count)||0));
+    $('#statByScripture').innerHTML=Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([id,n])=>`<div class="record-head hairline"><div class="scripture">${esc(scriptures.find(s=>s.id===id)?.title||'已刪除經文')}</div><div class="daily">${n.toLocaleString()} <span style="font-size:13px">次</span></div></div>`).join('')||'<div class="empty">這個期間尚無資料</div>';
+  }
+  $$('.stats-tab').forEach(btn=>btn.onclick=()=>{statRange=btn.dataset.range;renderStats()});
+
+  function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+  function attr(s=''){return esc(s)}
+  if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+})();

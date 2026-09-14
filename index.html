@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#F7F4EC" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="mindful counts" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Noto+Serif+TC:wght@300;400;500&display=swap" rel="stylesheet">
+  <title>mindful counts</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="app" id="app">
+  <div class="toast" id="toast"></div>
+
+  <section class="screen active" data-screen="home">
+    <button class="menu-btn" id="menuBtn" aria-label="menu">···</button>
+    <div class="menu-pop" id="menuPop">
+      <button data-go="records">念誦紀錄</button>
+      <button data-go="stats">統計</button>
+      <button data-go="library">我的經文</button>
+    </div>
+    <div class="blur coral home-grad-coral"></div><div class="blur sage home-grad-sage"></div><div class="blur charcoal home-grad-charcoal"></div>
+    <div class="content">
+      <div class="home-brand"><span>mindful</span><span>counts</span></div>
+      <div class="home-space"></div>
+      <div class="home-actions">
+        <button class="home-row" id="startFromHome"><span class="mini-mark">•</span><span class="label">開始念誦</span><span class="chev">›</span></button>
+        <button class="home-row" data-go="search"><span class="mini-mark">⌕</span><span class="label">搜尋經文</span><span class="chev">›</span></button>
+        <button class="home-row" id="manualAdd"><span class="mini-mark">＋</span><span class="label">手動新增</span><span class="chev">›</span></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="search">
+    <div class="content">
+      <div class="topbar"><button class="back" data-back>‹</button><span></span></div>
+      <h1 class="page-title">搜尋經文</h1>
+      <div class="searchbox"><span>⌕</span><input id="searchInput" placeholder="輸入經文名稱，例如：心經" autocomplete="off"><button class="x" id="clearSearch">×</button></div>
+      <div class="status" id="searchStatus">搜尋結果可先預覽全文，再決定要匯入哪個版本。</div>
+      <div id="searchResults"></div>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="preview">
+    <div class="content">
+      <div class="topbar"><button class="back" data-back>‹</button><span></span></div>
+      <h1 class="page-title" style="margin-bottom:14px">版本預覽</h1>
+      <div class="preview-meta"><div><div class="small-title" id="previewTitle">—</div></div><span class="preview-source">維基文庫</span></div>
+      <div class="preview-body" id="previewBody"><div class="preview-loading">正在載入全文…</div></div>
+      <div class="preview-actions">
+        <button class="primary" id="confirmImport" disabled>匯入這個版本</button>
+        <button class="secondary" id="backToResults">返回搜尋結果</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="editor">
+    <div class="content">
+      <div class="topbar"><button class="back" data-back>‹</button><button class="more" id="deleteScripture" style="display:none">···</button></div>
+      <h1 class="page-title" id="editorHeading">手動新增</h1>
+      <span class="source-chip" id="sourceChip" style="display:none"></span>
+      <div class="field"><label>經文名稱</label><input id="editTitle" placeholder="輸入經文名稱"></div>
+      <div class="field"><label>經文內容</label><textarea id="editContent" placeholder="輸入或匯入經文內容"></textarea><small id="contentCount">0 字</small></div>
+      <div class="field dedication"><label>回向文 <span class="subtle">（獨立儲存）</span></label><textarea id="editDedication" placeholder="輸入回向文"></textarea></div>
+      <button class="primary" id="saveScripture">儲存經文</button>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="library">
+    <div class="content">
+      <div class="topbar"><button class="back" data-back>‹</button><button class="ghost" id="libAdd">＋</button></div>
+      <h1 class="page-title">我的經文</h1>
+      <div id="libraryList"></div>
+    </div>
+  </section>
+
+  <section class="screen counter-screen" data-screen="counter">
+    <div class="content">
+      <div class="topbar"><button class="back" id="counterBack">‹</button><button class="more" id="counterMore">···</button></div>
+      <div class="counter-title" id="counterTitle">心經</div>
+      <div class="counter-visual">
+        <div class="blur coral counter-glow-coral"></div><div class="blur sage counter-glow-sage"></div>
+        <div class="count-number" id="countNumber">0</div><div class="count-unit">次</div>
+        <button class="count-hit" id="countHit">＋</button>
+        <div class="time-block"><div class="elapsed" id="elapsed">00:00:00</div><div class="session-range" id="sessionRange">—</div></div>
+        <div class="control-dock"><button class="dock-btn" id="pauseBtn">Ⅱ</button><button class="dock-btn dock-dot" id="dockDot">○</button><button class="dock-btn" id="stopBtn">■</button></div>
+      </div>
+      <div class="reading-section" id="counterReading">
+        <div class="reading-toolbar"><span class="reading-count" id="readingCount">0 次</span><button class="reading-add" id="readingCountHit">＋1</button></div>
+        <div class="reading-label">經文</div>
+        <h2 class="reading-title" id="readingTitle">—</h2>
+        <div class="reading-text" id="readingText"></div>
+        <div class="reading-dedication" id="readingDedication" style="display:none">
+          <div class="reading-label">回向文</div>
+          <div class="reading-text" id="readingDedicationText"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="complete">
+    <div class="content">
+      <div class="topbar"><button class="back" data-go="home">‹</button><button class="more" id="completeMore">···</button></div>
+      <div class="complete-center"><div class="check">✓</div><div class="completed">completed</div><div class="complete-count"><span id="completeCount">0</span> <span style="font-size:18px">次</span></div></div>
+      <div class="summary"><div><span class="subtle">本次時長</span><strong id="completeDuration">00:00:00</strong></div><div><span class="subtle">日期</span><strong id="completeDate" style="font-size:17px">—</strong></div><div><span class="subtle">開始時間</span><strong id="completeStart" style="font-size:17px">—</strong></div><div><span class="subtle">結束時間</span><strong id="completeEnd" style="font-size:17px">—</strong></div></div>
+      <div class="today-total"><span class="subtle">今天累積</span><br><b id="todayTotal">0</b> 次</div>
+      <div class="dedication-card" id="dedicationCard" style="display:none"><h3>回向文</h3><p id="completeDedication"></p></div>
+      <button class="primary" data-go="records">查看紀錄</button>
+      <button class="secondary" data-go="home">完成</button>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="records">
+    <div class="content">
+      <div class="topbar"><button class="back" data-go="home">‹</button><span></span></div>
+      <h1 class="page-title">念誦紀錄</h1>
+      <div id="recordList"></div>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="sessionEditor">
+    <div class="content">
+      <div class="topbar"><button class="back" data-back>‹</button><span></span></div>
+      <h1 class="page-title">編輯念誦紀錄</h1>
+      <div class="field"><label>經文</label><select id="sessionScripture"></select></div>
+      <div class="field"><label>本次次數</label><input id="sessionCount" type="number" min="0" inputmode="numeric"></div>
+      <div class="field"><label>日期</label><input id="sessionDate" type="date"></div>
+      <div class="field-row">
+        <div class="field"><label>開始時間</label><input id="sessionStartTime" type="time"></div>
+        <div class="field"><label>結束時間</label><input id="sessionEndTime" type="time"></div>
+      </div>
+      <div class="duration-preview"><span class="subtle">依目前時間重新計算時長</span><br><span id="sessionDurationPreview">00:00:00</span></div>
+      <button class="primary" id="saveSessionEdit">儲存修改</button>
+      <button class="danger-button" id="deleteSessionEdit">刪除這次紀錄</button>
+    </div>
+  </section>
+
+  <section class="screen" data-screen="stats">
+    <div class="content">
+      <div class="topbar"><button class="back" data-go="home">‹</button><span></span></div>
+      <h1 class="page-title" style="font-family:var(--latin);font-size:38px">statistics</h1>
+      <div class="stats-tabs" role="tablist" aria-label="統計期間">
+        <button class="stats-tab active" data-range="week" role="tab" aria-selected="true">week</button>
+        <button class="stats-tab" data-range="month" role="tab" aria-selected="false">month</button>
+        <button class="stats-tab" data-range="year" role="tab" aria-selected="false">year</button>
+      </div>
+      <div class="stats-period" id="statsPeriod">—</div>
+      <div class="stats-hero"><div><div class="big" id="statDays">0</div><span class="subtle">active days</span></div><div style="text-align:right"><div class="big" id="statTotal">0</div><span class="subtle">total counts</span></div></div>
+      <div class="bars" id="bars"><div class="chart-tip" id="chartTip"></div></div>
+      <div class="stat-list-head"><h2>經文累積</h2><span class="subtle" id="statListPeriod"></span></div>
+      <div id="statByScripture"></div>
+    </div>
+  </section>
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+  <div class="action-sheet" id="actionSheet" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="sheet-copy"><div class="sheet-title" id="sheetTitle"></div><div class="sheet-note" id="sheetNote"></div></div>
+    <div id="sheetActions"></div>
+    <button class="sheet-cancel" id="sheetCancel">取消</button>
+  </div>
+</div>
+<script src="app.js"></script>
+</body></html>

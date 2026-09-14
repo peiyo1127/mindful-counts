@@ -1,0 +1,11 @@
+{
+  "name":"mindful counts",
+  "short_name":"counts",
+  "start_url":"./index.html",
+  "display":"standalone",
+  "background_color":"#F7F4EC",
+  "theme_color":"#F7F4EC",
+  "icons":[
+    {"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
