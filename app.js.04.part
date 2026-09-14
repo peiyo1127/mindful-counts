@@ -1,0 +1,63 @@
+    const today=sessions.filter(x=>x.scriptureId===activeSession.scriptureId&&dayKey(x.startedAt)===dayKey(activeSession.startedAt)).reduce((a,b)=>a+(Number(b.count)||0),0)+(activeSession.count||0);
+    openSheet({title:`今天目前累積 ${today} 次`,note:'進行中的念誦不會跳去其他編輯頁，避免計時或次數被意外打斷。',actions:[
+      {label:'放棄這次念誦',kind:'danger',run:()=>discardActiveSession()}
+    ]});
+  };
+  function discardActiveSession(){clearInterval(timer);activeSession=null;toast('這次沒有留下紀錄');go('home')}
+  function finishSession(force=false){
+    if(!activeSession)return;
+    if(activeSession.count===0&&!force){
+      return openSheet({title:'這次還是 0 次',note:'如果是誤按開始，可以直接放棄；若你確實想留下 0 次紀錄，也可以儲存。',actions:[
+        {label:'儲存 0 次紀錄',run:()=>finishSession(true)},
+        {label:'放棄這次，不留紀錄',kind:'danger',run:()=>discardActiveSession()}
+      ]});
+    }
+    clearInterval(timer);
+    if(activeSession.pauseStarted){activeSession.pausedMs+=Date.now()-activeSession.pauseStarted;activeSession.pauseStarted=null}
+    activeSession.endedAt=Date.now();activeSession.durationMs=activeElapsed();
+    sessions.unshift({...activeSession});lastCompletedId=activeSession.id;persist();
+    const s=scriptures.find(x=>x.id===activeSession.scriptureId);
+    const today=sessions.filter(x=>x.scriptureId===activeSession.scriptureId&&dayKey(x.startedAt)===dayKey(activeSession.startedAt)).reduce((a,b)=>a+(Number(b.count)||0),0);
+    $('#completeCount').textContent=activeSession.count.toLocaleString();$('#completeDuration').textContent=fmtDur(activeSession.durationMs);$('#completeDate').textContent=fmtDate(activeSession.startedAt);$('#completeStart').textContent=fmtTime(activeSession.startedAt);$('#completeEnd').textContent=fmtTime(activeSession.endedAt);$('#todayTotal').textContent=today.toLocaleString();
+    if(s?.dedication){$('#dedicationCard').style.display='block';$('#completeDedication').textContent=s.dedication}else $('#dedicationCard').style.display='none';
+    activeSession=null;go('complete');
+  }
+
+  $('#completeMore').onclick=()=>{
+    const id=lastCompletedId;if(!id||!sessions.find(x=>x.id===id))return toast('這筆紀錄已不存在');
+    openSheet({title:'這次念誦紀錄',actions:[
+      {label:'編輯這次紀錄',run:()=>openSessionEditor(id)},
+      {label:'刪除這次紀錄',kind:'danger',run:()=>confirmDeleteSession(id,()=>go('home'))}
+    ]});
+  };
+
+  function renderRecords(){
+    const el=$('#recordList');if(!sessions.length){el.innerHTML='<div class="empty">還沒有念誦紀錄。</div>';return;}
+    const groups={};sessions.forEach(sess=>{const d=dayKey(sess.startedAt);const key=d+'__'+sess.scriptureId;(groups[key]??=[]).push(sess)});
+    const dates=[...new Set(Object.values(groups).flat().map(x=>dayKey(x.startedAt)))].sort().reverse();let html='';
+    dates.forEach(d=>{
+      html+=`<div class="record-date">${d.replaceAll('-','.')}</div>`;
+      Object.entries(groups).filter(([k])=>k.startsWith(d+'__')).forEach(([k,arr])=>{
+        const sid=k.split('__')[1],s=scriptures.find(x=>x.id===sid),name=s?.title||'已刪除經文',total=arr.reduce((a,b)=>a+(Number(b.count)||0),0);
+        html+=`<div class="record-group"><div class="record-head"><div class="scripture">${esc(name)}</div><div><span class="subtle">今日累積</span> <span class="daily">${total.toLocaleString()}</span> 次</div></div>${arr.sort((a,b)=>a.startedAt-b.startedAt).map((x,i)=>`<div class="session-row"><span>第 ${i+1} 次</span><span><strong>${fmtTime(x.startedAt)}–${fmtTime(x.endedAt)}</strong><br>${fmtDur(x.durationMs)}</span><span class="session-actions"><span class="session-time">${Number(x.count||0).toLocaleString()} 次</span><button class="session-menu" data-session-id="${x.id}" aria-label="紀錄選項">···</button></span></div>`).join('')}</div>`;
+      });
+    });
+    el.innerHTML=html;
+    el.querySelectorAll('.session-menu').forEach(btn=>btn.onclick=()=>openSessionActions(btn.dataset.sessionId));
+  }
+  function openSessionActions(id){
+    const sess=sessions.find(x=>x.id===id);if(!sess)return;
+    const name=scriptures.find(x=>x.id===sess.scriptureId)?.title||'已刪除經文';
+    openSheet({title:`${name} · ${fmtDate(sess.startedAt)}`,note:`${fmtTime(sess.startedAt)}–${fmtTime(sess.endedAt)} · ${sess.count} 次`,actions:[
+      {label:'編輯這次紀錄',run:()=>openSessionEditor(id)},
+      {label:'刪除這次紀錄',kind:'danger',run:()=>confirmDeleteSession(id)}
+    ]});
+  }
+  function confirmDeleteSession(id,after){
+    const sess=sessions.find(x=>x.id===id);if(!sess)return;
+    const scripture=scriptures.find(x=>x.id===sess.scriptureId);const name=scripture?.title||'這部經文';
+    openSheet({title:'確定刪除這次紀錄？',note:`${fmtDate(sess.startedAt)} ${fmtTime(sess.startedAt)} · ${name} · ${sess.count} 次。刪除後，當日累積與統計會同步重算。`,actions:[
+      {label:'刪除這次紀錄',kind:'danger',run:()=>deleteSession(id,after)}
+    ]});
+  }
+  function deleteSession(id,after){
