@@ -1,0 +1,63 @@
+      $('#searchResults').querySelectorAll('.preview-btn').forEach(b=>b.onclick=()=>previewPage(b.dataset.title));
+    }catch(e){$('#searchStatus').textContent='目前無法連線搜尋。你仍可使用手動新增。';}
+  }
+
+  async function fetchPageText(title){
+    const url=`https://zh.wikisource.org/w/api.php?action=parse&page=${encodeURIComponent(title)}&prop=text&format=json&origin=*`;
+    const r=await fetch(url); if(!r.ok)throw 0;
+    const j=await r.json(); const html=j.parse?.text?.['*']; if(!html)throw 0;
+    const doc=new DOMParser().parseFromString(html,'text/html');
+    doc.querySelectorAll('script,style,.mw-editsection,.noprint,.navbox,table,sup.reference').forEach(n=>n.remove());
+    doc.querySelectorAll('br').forEach(br=>br.replaceWith('\n'));
+    doc.querySelectorAll('p,div.poem,li').forEach(n=>n.append('\n'));
+    return (doc.body.innerText||doc.body.textContent||'').replace(/\n{3,}/g,'\n\n').replace(/[ \t]+\n/g,'\n').trim();
+  }
+  async function previewPage(title){
+    previewData={title,text:'',source:'維基文庫'};
+    $('#previewTitle').textContent=title;
+    $('#previewBody').innerHTML='<div class="preview-loading"><span class="loading"></span> 正在載入全文…</div>';
+    $('#confirmImport').disabled=true; go('preview');
+    try{const text=await fetchPageText(title);previewData.text=text;$('#previewBody').textContent=text||'這個版本沒有可讀取的正文內容。';$('#confirmImport').disabled=!text;}
+    catch(e){$('#previewBody').innerHTML='<div class="preview-loading">預覽載入失敗。請返回搜尋結果後重試，或改用手動新增。</div>';$('#confirmImport').disabled=true;}
+  }
+  $('#backToResults').onclick=()=>{history.pop();go('search',false)};
+  $('#confirmImport').onclick=()=>{
+    if(!previewData?.text)return;
+    editingId=null; importedSource=previewData.source;
+    $('#editorHeading').textContent='匯入經文';
+    $('#editTitle').value=previewData.title;
+    $('#editContent').value=previewData.text;
+    $('#editDedication').value='';
+    $('#sourceChip').textContent='來源：維基文庫';
+    $('#sourceChip').style.display='inline-block';
+    $('#deleteScripture').style.display='none'; updateCount(); go('editor');
+  };
+
+  function startSession(scriptureId){
+    const s=scriptures.find(x=>x.id===scriptureId);if(!s)return;
+    activeSession={id:crypto.randomUUID(),scriptureId,count:0,startedAt:Date.now(),pausedMs:0,pauseStarted:null,endedAt:null};
+    $('#counterTitle').textContent=s.title;
+    $('#readingTitle').textContent=s.title;
+    $('#readingText').textContent=s.content||'';
+    $('#readingText').classList.toggle('reading-empty',!s.content);
+    if(!s.content) $('#readingText').textContent='這部經文尚未加入正文內容。';
+    if(s.dedication){$('#readingDedication').style.display='block';$('#readingDedicationText').textContent=s.dedication}else{$('#readingDedication').style.display='none';$('#readingDedicationText').textContent=''}
+    $('#countNumber').textContent='0';$('#readingCount').textContent='0 次';$('#pauseBtn').textContent='Ⅱ';updateCounterTime();go('counter');clearInterval(timer);timer=setInterval(updateCounterTime,1000);
+  }
+  function activeElapsed(){if(!activeSession)return 0;const end=activeSession.endedAt||Date.now();let p=activeSession.pausedMs||0;if(activeSession.pauseStarted)p+=end-activeSession.pauseStarted;return end-activeSession.startedAt-p}
+  function updateCounterTime(){if(!activeSession)return;$('#elapsed').textContent=fmtDur(activeElapsed());$('#sessionRange').textContent=`${fmtDate(activeSession.startedAt)} ${fmtTime(activeSession.startedAt)} — ${activeSession.pauseStarted?'paused':fmtTime(Date.now())}`}
+  function incrementCount(){if(!activeSession||activeSession.pauseStarted)return;activeSession.count++;$('#countNumber').textContent=activeSession.count;$('#readingCount').textContent=`${activeSession.count.toLocaleString()} 次`;if(navigator.vibrate)navigator.vibrate(12)}
+  $('#countHit').onclick=incrementCount;
+  $('#readingCountHit').onclick=incrementCount;
+  $('#pauseBtn').onclick=()=>{if(!activeSession)return;if(activeSession.pauseStarted){activeSession.pausedMs+=Date.now()-activeSession.pauseStarted;activeSession.pauseStarted=null;$('#pauseBtn').textContent='Ⅱ'}else{activeSession.pauseStarted=Date.now();$('#pauseBtn').textContent='▶'}updateCounterTime()};
+  $('#stopBtn').onclick=()=>finishSession();
+  $('#dockDot').onclick=()=>toast(`本次 ${activeSession?.count||0} 次`);
+  $('#counterBack').onclick=()=>{
+    if(!activeSession)return go('home');
+    openSheet({title:'離開這次念誦？',note:`目前 ${activeSession.count} 次。離開時可以儲存，也可以直接放棄，不會再產生誤觸紀錄。`,actions:[
+      {label:'儲存並結束',run:()=>finishSession(true)},
+      {label:'放棄這次，不留紀錄',kind:'danger',run:()=>discardActiveSession()}
+    ]});
+  };
+  $('#counterMore').onclick=()=>{
+    if(!activeSession)return;
