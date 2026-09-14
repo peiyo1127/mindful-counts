@@ -1,0 +1,87 @@
+(() => {
+  const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+  const KEYS={scriptures:'mc_scriptures_v4',sessions:'mc_sessions_v4'};
+  let scriptures=safeJSON(localStorage.getItem(KEYS.scriptures),[]);
+  let sessions=safeJSON(localStorage.getItem(KEYS.sessions),[]);
+  let history=['home'];
+  let editingId=null, importedSource='';
+  let previewData=null;
+  let activeSession=null, timer=null, lastCompletedId=null, editingSessionId=null, editingSessionOriginal=null;
+  let sheetActions=[];
+  let statRange='week';
+
+  function safeJSON(v,fallback){try{return JSON.parse(v)||fallback}catch{return fallback}}
+  const fmtDate=d=>{d=new Date(d);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`};
+  const dayKey=d=>{d=new Date(d);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+  const fmtTime=d=>new Date(d).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
+  const fmtDur=ms=>{const t=Math.max(0,Math.floor(ms/1000)),h=Math.floor(t/3600),m=Math.floor(t%3600/60),s=t%60;return [h,m,s].map(v=>String(v).padStart(2,'0')).join(':')};
+  const inputDate=ts=>dayKey(ts);
+  const inputTime=ts=>{const d=new Date(ts);return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
+  const combineLocal=(date,time)=>{const [y,m,d]=date.split('-').map(Number),[hh,mm]=time.split(':').map(Number);return new Date(y,m-1,d,hh,mm,0,0).getTime()};
+  const persist=()=>{localStorage.setItem(KEYS.scriptures,JSON.stringify(scriptures));localStorage.setItem(KEYS.sessions,JSON.stringify(sessions))};
+  const toast=msg=>{const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1600)};
+  const normTitle=s=>(s||'').replace(/\s+/g,'').replace(/[（）()\-—_·・]/g,'').toLowerCase();
+
+  function go(name,push=true){
+    closeSheet();
+    $$('.screen').forEach(s=>s.classList.toggle('active',s.dataset.screen===name));
+    const activeScreen=$(`.screen[data-screen="${name}"]`);
+    if(activeScreen) activeScreen.scrollTop=0;
+    if(push&&history[history.length-1]!==name) history.push(name);
+    $('#menuPop').classList.remove('open');
+    if(name==='library')renderLibrary();
+    if(name==='records')renderRecords();
+    if(name==='stats')renderStats();
+    window.scrollTo(0,0);
+  }
+  $$('[data-go]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.go)));
+  $$('[data-back]').forEach(b=>b.addEventListener('click',()=>{history.pop();go(history[history.length-1]||'home',false)}));
+  $('#menuBtn').onclick=()=>$('#menuPop').classList.toggle('open');
+
+  function openSheet({title='',note='',actions=[]}){
+    sheetActions=actions;
+    $('#sheetTitle').textContent=title;
+    $('#sheetNote').textContent=note;
+    $('#sheetNote').style.display=note?'block':'none';
+    $('#sheetActions').innerHTML=actions.map((a,i)=>`<button class="sheet-action ${a.kind==='danger'?'danger':''}" data-sheet-index="${i}">${esc(a.label)}</button>`).join('');
+    $('#sheetActions').querySelectorAll('[data-sheet-index]').forEach(btn=>btn.onclick=()=>{
+      const a=sheetActions[Number(btn.dataset.sheetIndex)];
+      closeSheet();
+      setTimeout(()=>a?.run?.(),80);
+    });
+    $('#sheetBackdrop').classList.add('open');
+    $('#actionSheet').classList.add('open');
+    $('#actionSheet').setAttribute('aria-hidden','false');
+  }
+  function closeSheet(){
+    $('#sheetBackdrop')?.classList.remove('open');
+    $('#actionSheet')?.classList.remove('open');
+    $('#actionSheet')?.setAttribute('aria-hidden','true');
+  }
+  $('#sheetBackdrop').onclick=closeSheet;
+  $('#sheetCancel').onclick=closeSheet;
+
+  function openEditor(id=null){
+    editingId=id; importedSource='';
+    const s=id?scriptures.find(x=>x.id===id):null;
+    $('#editorHeading').textContent=s?'編輯經文':'手動新增';
+    $('#editTitle').value=s?.title||'';
+    $('#editContent').value=s?.content||'';
+    $('#editDedication').value=s?.dedication||'';
+    $('#sourceChip').style.display=s?.source?'inline-block':'none';
+    if(s?.source)$('#sourceChip').textContent=s.source;
+    $('#deleteScripture').style.display=s?'block':'none';
+    updateCount(); go('editor');
+  }
+  $('#manualAdd').onclick=()=>openEditor();
+  $('#libAdd').onclick=()=>openEditor();
+  $('#editContent').oninput=updateCount;
+  function updateCount(){ $('#contentCount').textContent=`${$('#editContent').value.length.toLocaleString()} 字`; }
+
+  function writeScripture(data,{overwriteId=null}={}){
+    const now=Date.now();
+    if(overwriteId){
+      const target=scriptures.find(x=>x.id===overwriteId);
+      if(target)Object.assign(target,data,{updatedAt:now});
+    }else if(editingId){
+      const target=scriptures.find(x=>x.id===editingId);
