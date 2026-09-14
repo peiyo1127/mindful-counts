@@ -11,3 +11,7 @@
     document.body.innerHTML='<main style="max-width:420px;margin:80px auto;padding:24px;font-family:serif;color:#333"><h1 style="font-weight:300">mindful counts</h1><p>載入失敗，請重新整理頁面。</p></main>';
   }
 })();
+
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(err=>console.warn('Service worker registration failed',err)));
+}
