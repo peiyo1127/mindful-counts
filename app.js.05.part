@@ -1,0 +1,65 @@
+    sessions=sessions.filter(x=>x.id!==id);persist();renderRecords();renderStats();toast('已刪除這次紀錄');after?.();
+  }
+
+  function openSessionEditor(id){
+    const sess=sessions.find(x=>x.id===id);if(!sess)return;
+    editingSessionId=id;
+    editingSessionOriginal={
+      scriptureId:sess.scriptureId,count:Number(sess.count)||0,startedAt:sess.startedAt,endedAt:sess.endedAt||sess.startedAt,durationMs:sess.durationMs||0,
+      date:inputDate(sess.startedAt),startTime:inputTime(sess.startedAt),endTime:inputTime(sess.endedAt||sess.startedAt)
+    };
+    $('#sessionScripture').innerHTML=scriptures.map(s=>`<option value="${s.id}">${esc(s.title)}</option>`).join('') + (!scriptures.some(s=>s.id===sess.scriptureId)?`<option value="${sess.scriptureId}">已刪除經文</option>`:'');
+    $('#sessionScripture').value=sess.scriptureId;
+    $('#sessionCount').value=Number(sess.count)||0;
+    $('#sessionDate').value=editingSessionOriginal.date;
+    $('#sessionStartTime').value=editingSessionOriginal.startTime;
+    $('#sessionEndTime').value=editingSessionOriginal.endTime;
+    updateSessionDurationPreview();go('sessionEditor');
+  }
+  function getSessionEditTimes(){
+    const date=$('#sessionDate').value,start=$('#sessionStartTime').value,end=$('#sessionEndTime').value;
+    if(!date||!start||!end)return null;
+    const st=combineLocal(date,start);let et=combineLocal(date,end);if(et<st)et+=86400000;return {st,et};
+  }
+  function updateSessionDurationPreview(){const t=getSessionEditTimes();$('#sessionDurationPreview').textContent=t?fmtDur(t.et-t.st):'—'}
+  ['sessionDate','sessionStartTime','sessionEndTime'].forEach(id=>$('#'+id).addEventListener('input',updateSessionDurationPreview));
+  $('#saveSessionEdit').onclick=()=>{
+    const sess=sessions.find(x=>x.id===editingSessionId);if(!sess)return;
+    const t=getSessionEditTimes();if(!t)return toast('請確認日期與時間');
+    const count=Math.max(0,Number($('#sessionCount').value)||0);
+    const timeFieldsUnchanged=editingSessionOriginal && $('#sessionDate').value===editingSessionOriginal.date && $('#sessionStartTime').value===editingSessionOriginal.startTime && $('#sessionEndTime').value===editingSessionOriginal.endTime;
+    const startedAt=timeFieldsUnchanged?editingSessionOriginal.startedAt:t.st;
+    const endedAt=timeFieldsUnchanged?editingSessionOriginal.endedAt:t.et;
+    const durationMs=timeFieldsUnchanged?editingSessionOriginal.durationMs:(t.et-t.st);
+    Object.assign(sess,{scriptureId:$('#sessionScripture').value,count,startedAt,endedAt,durationMs,pausedMs:0,pauseStarted:null,editedAt:Date.now()});
+    persist();renderRecords();renderStats();toast('已更新紀錄');go('records');
+  };
+  $('#deleteSessionEdit').onclick=()=>editingSessionId&&confirmDeleteSession(editingSessionId,()=>go('records'));
+
+  const startOfDay=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  const endOfDay=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,59,999);
+  function statsWindow(range){
+    const now=new Date();
+    if(range==='month'){
+      const start=new Date(now.getFullYear(),now.getMonth(),1),end=endOfDay(new Date(now.getFullYear(),now.getMonth()+1,0));
+      const daysInMonth=end.getDate(),buckets=[];
+      for(let from=1;from<=daysInMonth;from+=7){
+        const to=Math.min(from+6,daysInMonth),bs=new Date(now.getFullYear(),now.getMonth(),from),be=endOfDay(new Date(now.getFullYear(),now.getMonth(),to));
+        buckets.push({start:bs,end:be,label:`${Math.floor((from-1)/7)+1}週`,tip:`${now.getMonth()+1}/${from}–${now.getMonth()+1}/${to}`});
+      }
+      return {start,end,buckets,label:`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}`};
+    }
+    if(range==='year'){
+      const start=new Date(now.getFullYear(),0,1),end=endOfDay(new Date(now.getFullYear(),11,31)),buckets=[];
+      for(let m=0;m<12;m++) buckets.push({start:new Date(now.getFullYear(),m,1),end:endOfDay(new Date(now.getFullYear(),m+1,0)),label:String(m+1),tip:`${m+1} 月`});
+      return {start,end,buckets,label:String(now.getFullYear())};
+    }
+    const end=endOfDay(now),start=startOfDay(new Date(now.getFullYear(),now.getMonth(),now.getDate()-6)),buckets=[];
+    for(let i=0;i<7;i++){
+      const d=new Date(start);d.setDate(start.getDate()+i);const bs=startOfDay(d),be=endOfDay(d);
+      buckets.push({start:bs,end:be,label:['日','一','二','三','四','五','六'][d.getDay()],tip:`${d.getMonth()+1}/${d.getDate()} · 週${['日','一','二','三','四','五','六'][d.getDay()]}`});
+    }
+    return {start,end,buckets,label:`${start.getMonth()+1}/${start.getDate()} – ${end.getMonth()+1}/${end.getDate()}`};
+  }
+  function sessionsInWindow(start,end){const a=start.getTime(),b=end.getTime();return sessions.filter(x=>Number(x.startedAt)>=a&&Number(x.startedAt)<=b)}
+  function renderStats(){
