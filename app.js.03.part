@@ -33,23 +33,59 @@
     $('#deleteScripture').style.display='none'; updateCount(); go('editor');
   };
 
-  function startSession(scriptureId){
-    const s=scriptures.find(x=>x.id===scriptureId);if(!s)return;
-    activeSession={id:crypto.randomUUID(),scriptureId,count:0,startedAt:Date.now(),pausedMs:0,pauseStarted:null,endedAt:null};
+  function persistActiveSession(){
+    if(!activeSession)return;
+    localStorage.setItem(KEYS.active,JSON.stringify({...activeSession,checkpointAt:Date.now()}));
+  }
+  function clearActiveSession(){localStorage.removeItem(KEYS.active)}
+  function renderActiveSessionUI(s){
     $('#counterTitle').textContent=s.title;
     $('#readingTitle').textContent=s.title;
     $('#readingText').textContent=s.content||'';
     $('#readingText').classList.toggle('reading-empty',!s.content);
-    if(!s.content) $('#readingText').textContent='這部經文尚未加入正文內容。';
+    if(!s.content)$('#readingText').textContent='這部經文尚未加入正文內容。';
     if(s.dedication){$('#readingDedication').style.display='block';$('#readingDedicationText').textContent=s.dedication}else{$('#readingDedication').style.display='none';$('#readingDedicationText').textContent=''}
-    $('#countNumber').textContent='0';$('#readingCount').textContent='0 次';$('#pauseBtn').textContent='Ⅱ';updateCounterTime();go('counter');clearInterval(timer);timer=setInterval(updateCounterTime,1000);
+    $('#countNumber').textContent=(activeSession?.count||0).toLocaleString();
+    $('#readingCount').textContent=`${(activeSession?.count||0).toLocaleString()} 次`;
+    $('#pauseBtn').textContent=activeSession?.pauseStarted?'▶':'Ⅱ';
+  }
+  function restoreActiveSession(){
+    const saved=safeJSON(localStorage.getItem(KEYS.active),null);
+    if(!saved?.id||!saved?.scriptureId)return false;
+    const s=scriptures.find(x=>x.id===saved.scriptureId);
+    if(!s){clearActiveSession();return false}
+    const now=Date.now(),checkpoint=Number(saved.checkpointAt)||now;
+    activeSession={...saved};
+    delete activeSession.checkpointAt;
+    activeSession.pausedMs=Number(activeSession.pausedMs)||0;
+    activeSession.count=Number(activeSession.count)||0;
+    if(activeSession.pauseStarted){
+      const pauseStart=Number(activeSession.pauseStarted)||checkpoint;
+      activeSession.pausedMs+=Math.max(0,now-pauseStart);
+      activeSession.pauseStarted=now;
+    }else{
+      activeSession.pausedMs+=Math.max(0,now-checkpoint);
+      activeSession.pauseStarted=null;
+    }
+    renderActiveSessionUI(s);
+    updateCounterTime();
+    go('counter');
+    clearInterval(timer);timer=setInterval(updateCounterTime,1000);
+    persistActiveSession();
+    return true;
+  }
+
+  function startSession(scriptureId){
+    const s=scriptures.find(x=>x.id===scriptureId);if(!s)return;
+    activeSession={id:crypto.randomUUID(),scriptureId,count:0,startedAt:Date.now(),pausedMs:0,pauseStarted:null,endedAt:null};
+    renderActiveSessionUI(s);persistActiveSession();updateCounterTime();go('counter');clearInterval(timer);timer=setInterval(updateCounterTime,1000);
   }
   function activeElapsed(){if(!activeSession)return 0;const end=activeSession.endedAt||Date.now();let p=activeSession.pausedMs||0;if(activeSession.pauseStarted)p+=end-activeSession.pauseStarted;return end-activeSession.startedAt-p}
-  function updateCounterTime(){if(!activeSession)return;$('#elapsed').textContent=fmtDur(activeElapsed());$('#sessionRange').textContent=`${fmtDate(activeSession.startedAt)} ${fmtTime(activeSession.startedAt)} — ${activeSession.pauseStarted?'paused':fmtTime(Date.now())}`}
-  function incrementCount(){if(!activeSession||activeSession.pauseStarted)return;activeSession.count++;$('#countNumber').textContent=activeSession.count;$('#readingCount').textContent=`${activeSession.count.toLocaleString()} 次`;if(navigator.vibrate)navigator.vibrate(12)}
+  function updateCounterTime(){if(!activeSession)return;$('#elapsed').textContent=fmtDur(activeElapsed());$('#sessionRange').textContent=`${fmtDate(activeSession.startedAt)} ${fmtTime(activeSession.startedAt)} — ${activeSession.pauseStarted?'paused':fmtTime(Date.now())}`;persistActiveSession()}
+  function incrementCount(){if(!activeSession||activeSession.pauseStarted)return;activeSession.count++;$('#countNumber').textContent=activeSession.count;$('#readingCount').textContent=`${activeSession.count.toLocaleString()} 次`;persistActiveSession();if(navigator.vibrate)navigator.vibrate(12)}
   $('#countHit').onclick=incrementCount;
   $('#readingCountHit').onclick=incrementCount;
-  $('#pauseBtn').onclick=()=>{if(!activeSession)return;if(activeSession.pauseStarted){activeSession.pausedMs+=Date.now()-activeSession.pauseStarted;activeSession.pauseStarted=null;$('#pauseBtn').textContent='Ⅱ'}else{activeSession.pauseStarted=Date.now();$('#pauseBtn').textContent='▶'}updateCounterTime()};
+  $('#pauseBtn').onclick=()=>{if(!activeSession)return;if(activeSession.pauseStarted){activeSession.pausedMs+=Date.now()-activeSession.pauseStarted;activeSession.pauseStarted=null;$('#pauseBtn').textContent='Ⅱ'}else{activeSession.pauseStarted=Date.now();$('#pauseBtn').textContent='▶'}persistActiveSession();updateCounterTime()};
   $('#stopBtn').onclick=()=>finishSession();
   $('#dockDot').onclick=()=>toast(`本次 ${activeSession?.count||0} 次`);
   $('#counterBack').onclick=()=>{
