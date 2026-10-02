@@ -409,7 +409,7 @@
     $('#statTotal').textContent=total.toLocaleString();
     $('#statsPeriod').textContent=w.label;
     $('#statListPeriod').textContent=w.label;
-    $$$('.stats-tab').forEach(btn=>{const on=btn.dataset.range===statRange;btn.classList.toggle('active',on);btn.setAttribute('aria-selected',on?'true':'false')});
+    $$('.stats-tab').forEach(btn=>{const on=btn.dataset.range===statRange;btn.classList.toggle('active',on);btn.setAttribute('aria-selected',on?'true':'false')});
     const points=w.buckets.map(b=>{const n=sessionsInWindow(b.start,b.end).reduce((a,x)=>a+(Number(x.count)||0),0);return {...b,n}});
     const mx=Math.max(1,...points.map(x=>x.n));
     const chart=$('#bars');
@@ -458,5 +458,5 @@
 
   function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
   function attr(s=''){return esc(s)}
-  if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=10').catch(()=>{});
+  if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=11').catch(()=>{});
 })();
