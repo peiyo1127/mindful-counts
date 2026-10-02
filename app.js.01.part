@@ -1,6 +1,6 @@
 (() => {
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
-  const KEYS={scriptures:'mc_scriptures_v4',sessions:'mc_sessions_v4'};
+  const KEYS={scriptures:'mc_scriptures_v4',sessions:'mc_sessions_v4',active:'mc_active_session_v1'};
   let scriptures=safeJSON(localStorage.getItem(KEYS.scriptures),[]);
   let sessions=safeJSON(localStorage.getItem(KEYS.sessions),[]);
   let history=['home'];
@@ -9,6 +9,7 @@
   let activeSession=null, timer=null, lastCompletedId=null, editingSessionId=null, editingSessionOriginal=null;
   let sheetActions=[];
   let statRange='week';
+  let statAnchor=new Date();
 
   function safeJSON(v,fallback){try{return JSON.parse(v)||fallback}catch{return fallback}}
   const fmtDate=d=>{d=new Date(d);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`};
