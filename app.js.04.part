@@ -3,7 +3,7 @@
       {label:'放棄這次念誦',kind:'danger',run:()=>discardActiveSession()}
     ]});
   };
-  function discardActiveSession(){clearInterval(timer);activeSession=null;toast('這次沒有留下紀錄');go('home')}
+  function discardActiveSession(){clearInterval(timer);clearActiveSession();activeSession=null;toast('這次沒有留下紀錄');go('home')}
   function finishSession(force=false){
     if(!activeSession)return;
     if(activeSession.count===0&&!force){
@@ -20,7 +20,7 @@
     const today=sessions.filter(x=>x.scriptureId===activeSession.scriptureId&&dayKey(x.startedAt)===dayKey(activeSession.startedAt)).reduce((a,b)=>a+(Number(b.count)||0),0);
     $('#completeCount').textContent=activeSession.count.toLocaleString();$('#completeDuration').textContent=fmtDur(activeSession.durationMs);$('#completeDate').textContent=fmtDate(activeSession.startedAt);$('#completeStart').textContent=fmtTime(activeSession.startedAt);$('#completeEnd').textContent=fmtTime(activeSession.endedAt);$('#todayTotal').textContent=today.toLocaleString();
     if(s?.dedication){$('#dedicationCard').style.display='block';$('#completeDedication').textContent=s.dedication}else $('#dedicationCard').style.display='none';
-    activeSession=null;go('complete');
+    clearActiveSession();activeSession=null;go('complete');
   }
 
   $('#completeMore').onclick=()=>{
