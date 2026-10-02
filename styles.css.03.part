@@ -42,7 +42,10 @@
     .stats-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:3px;background:rgba(36,36,36,.055);border-radius:24px;padding:3px;margin:2px 0 24px}
     .stats-tab{border:0;background:transparent;border-radius:21px;padding:9px 10px;font:500 11px/1 var(--sans);color:#7f7a73;transition:.18s}
     .stats-tab.active{background:rgba(255,255,255,.74);color:#252525;box-shadow:0 1px 5px rgba(0,0,0,.06)}
-    .stats-period{font:300 15px/1.5 var(--serif);color:#6d6963;margin:-10px 0 6px}
+    .stats-period-nav{display:grid;grid-template-columns:34px 1fr 34px;align-items:center;gap:6px;margin:-10px 0 6px}
+    .stats-period{border:0;background:transparent;font:300 15px/1.5 var(--serif);color:#6d6963;padding:6px 2px;text-align:center}
+    .stats-nav-btn{border:0;background:transparent;color:#77716a;font:300 25px/1 var(--latin);padding:2px 4px}
+    .stats-native-picker{position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0;pointer-events:none}
     .stats-hero{display:flex;justify-content:space-between;align-items:flex-end;padding:12px 0 22px;border-bottom:1px solid var(--line)}
     .stats-hero .big{font:300 58px/.9 var(--latin)}
     .bars{position:relative;height:208px;display:flex;align-items:flex-end;gap:12px;padding:42px 0 22px;border-bottom:1px solid var(--line)}
