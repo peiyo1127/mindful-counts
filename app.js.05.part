@@ -38,8 +38,8 @@
 
   const startOfDay=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate());
   const endOfDay=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate(),23,59,59,999);
-  function statsWindow(range){
-    const now=new Date();
+  function statsWindow(range,anchor=statAnchor){
+    const now=new Date(anchor);
     if(range==='month'){
       const start=new Date(now.getFullYear(),now.getMonth(),1),end=endOfDay(new Date(now.getFullYear(),now.getMonth()+1,0));
       const daysInMonth=end.getDate(),buckets=[];
