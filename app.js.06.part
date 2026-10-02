@@ -1,10 +1,10 @@
-    const w=statsWindow(statRange),filtered=sessionsInWindow(w.start,w.end);
+    const w=statsWindow(statRange,statAnchor),filtered=sessionsInWindow(w.start,w.end);
     const activeDays=new Set(filtered.map(x=>dayKey(x.startedAt))).size;
     const total=filtered.reduce((a,b)=>a+(Number(b.count)||0),0);
     $('#statDays').textContent=activeDays.toLocaleString();
     $('#statTotal').textContent=total.toLocaleString();
     $('#statsPeriod').textContent=w.label;
-    $('#statListPeriod').textContent=statRange==='week'?'最近 7 天':statRange==='month'?'本月':'今年';
+    $('#statListPeriod').textContent=w.label;
     $$('.stats-tab').forEach(btn=>{const on=btn.dataset.range===statRange;btn.classList.toggle('active',on);btn.setAttribute('aria-selected',on?'true':'false')});
     const points=w.buckets.map(b=>{const n=sessionsInWindow(b.start,b.end).reduce((a,x)=>a+(Number(x.count)||0),0);return {...b,n}});
     const mx=Math.max(1,...points.map(x=>x.n));
@@ -21,7 +21,36 @@
     const by={};filtered.forEach(x=>by[x.scriptureId]=(by[x.scriptureId]||0)+(Number(x.count)||0));
     $('#statByScripture').innerHTML=Object.entries(by).sort((a,b)=>b[1]-a[1]).map(([id,n])=>`<div class="record-head hairline"><div class="scripture">${esc(scriptures.find(s=>s.id===id)?.title||'已刪除經文')}</div><div class="daily">${n.toLocaleString()} <span style="font-size:13px">次</span></div></div>`).join('')||'<div class="empty">這個期間尚無資料</div>';
   }
-  $$('.stats-tab').forEach(btn=>btn.onclick=()=>{statRange=btn.dataset.range;renderStats()});
+  function shiftStats(dir){
+    const d=new Date(statAnchor);
+    if(statRange==='week')d.setDate(d.getDate()+dir*7);
+    else if(statRange==='month')d.setMonth(d.getMonth()+dir);
+    else d.setFullYear(d.getFullYear()+dir);
+    statAnchor=d;renderStats();
+  }
+  $('#statsPrev').onclick=()=>shiftStats(-1);
+  $('#statsNext').onclick=()=>shiftStats(1);
+  $('#statsPeriod').onclick=()=>{
+    const picker=statRange==='month'?$('#statsMonthPicker'):$('#statsDatePicker');
+    if(statRange==='month')picker.value=`${statAnchor.getFullYear()}-${String(statAnchor.getMonth()+1).padStart(2,'0')}`;
+    else picker.value=dayKey(statAnchor);
+    try{if(picker.showPicker)picker.showPicker();else picker.click()}catch{picker.click()}
+  };
+  $('#statsDatePicker').onchange=e=>{
+    if(!e.target.value)return;
+    const [y,m,d]=e.target.value.split('-').map(Number);
+    statAnchor=new Date(y,m-1,d,12,0,0,0);renderStats();
+  };
+  $('#statsMonthPicker').onchange=e=>{
+    if(!e.target.value)return;
+    const [y,m]=e.target.value.split('-').map(Number);
+    statAnchor=new Date(y,m-1,1,12,0,0,0);renderStats();
+  };
+  $('.stats-tab').forEach(btn=>btn.onclick=()=>{statRange=btn.dataset.range;renderStats()});
+
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')persistActiveSession()});
+  window.addEventListener('pagehide',()=>persistActiveSession());
+  restoreActiveSession();
 
   function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
   function attr(s=''){return esc(s)}
